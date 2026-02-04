@@ -43,14 +43,14 @@ tasks:
       - curl -o swagger.json -sSL https://dac-static.atlassian.com/cloud/confluence/openapi-v2.v3.json
 
   generate-swagger:
-    desc: Generate Go client from swagger_confluence.json using openapi-generator
+    desc: Generate Go client from swagger.json using openapi-generator
     preconditions:
       - sh: command -v openapi-generator
         msg: "openapi-generator is required but not installed. Install with: brew install openapi-generator"
-      - sh: test -f swagger_confluence.json
-        msg: "swagger.json not found. Run 'task pull-swagger-confluence' first"
+      - sh: test -f swagger.json
+        msg: "swagger.json not found. Run 'task pull-swagger' first"
     cmds:
-      - rm -rf swagger_confluence
+      - rm -rf swagger
       - >-
-        openapi-generator generate -i swagger.json -g go -o swagger --package-name swagger --additional-properties=isGoSubmodule=true --git-user-id alexhokl --git-repo-id jira-cli
+        openapi-generator generate -i swagger.json -g go -o swagger --package-name swagger --additional-properties=isGoSubmodule=true --git-user-id alexhokl --git-repo-id confluence-cli
       - go mod tidy
