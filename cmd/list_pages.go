@@ -6,9 +6,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/alexhokl/confluence-cli/swagger"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -145,8 +145,14 @@ func containsIgnoreCase(s, substr string) bool {
 }
 
 func printPages(pages []swagger.PageBulk) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tSPACE ID\tPARENT ID")
+	color.NoColor = noColor
+
+	yellow := color.New(color.FgYellow).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()
+
+	w := newTableWriter(os.Stdout, 0, 2)
+	w.row("ID", "TITLE", "STATUS", "SPACE ID", "PARENT ID")
 
 	for _, page := range pages {
 		status := ""
@@ -157,13 +163,25 @@ func printPages(pages []swagger.PageBulk) {
 		if page.HasParentId() {
 			parentID = page.GetParentId()
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			page.GetId(),
+
+		// Color the status based on value
+		coloredStatus := status
+		switch status {
+		case "current":
+			coloredStatus = green(status)
+		case "draft":
+			coloredStatus = yellow(status)
+		case "archived", "trashed":
+			coloredStatus = red(status)
+		}
+
+		w.row(
+			yellow(page.GetId()),
 			page.GetTitle(),
-			status,
+			coloredStatus,
 			page.GetSpaceId(),
 			parentID,
 		)
 	}
-	w.Flush()
+	w.flush()
 }

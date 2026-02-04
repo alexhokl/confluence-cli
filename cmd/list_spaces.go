@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"text/tabwriter"
 
 	"github.com/alexhokl/confluence-cli/swagger"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -99,8 +99,15 @@ func extractCursor(nextURL string) (string, error) {
 }
 
 func printSpaces(spaces []swagger.SpaceBulk) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "KEY\tNAME\tTYPE\tSTATUS")
+	color.NoColor = noColor
+
+	yellow := color.New(color.FgYellow).SprintFunc()
+	magenta := color.New(color.FgMagenta).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()
+
+	w := newTableWriter(os.Stdout, 0, 2)
+	w.row("KEY", "NAME", "TYPE", "STATUS")
 
 	for _, space := range spaces {
 		spaceType := ""
@@ -111,12 +118,22 @@ func printSpaces(spaces []swagger.SpaceBulk) {
 		if space.HasStatus() {
 			status = string(space.GetStatus())
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-			space.GetKey(),
+
+		// Color the status based on value
+		coloredStatus := status
+		switch status {
+		case "current":
+			coloredStatus = green(status)
+		case "archived":
+			coloredStatus = red(status)
+		}
+
+		w.row(
+			yellow(space.GetKey()),
 			space.GetName(),
-			spaceType,
-			status,
+			magenta(spaceType),
+			coloredStatus,
 		)
 	}
-	w.Flush()
+	w.flush()
 }

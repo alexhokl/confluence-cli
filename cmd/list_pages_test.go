@@ -7,6 +7,11 @@ import (
 )
 
 func TestPrintPages(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Test that printPages doesn't panic with empty slice
 	pages := []swagger.PageBulk{}
 	printPages(pages)
@@ -47,6 +52,11 @@ func TestListPagesFlags(t *testing.T) {
 }
 
 func TestPrintPagesWithParentID(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Test with a page that has a parent ID
 	page := swagger.PageBulk{}
 	page.SetId("123")
@@ -62,6 +72,11 @@ func TestPrintPagesWithParentID(t *testing.T) {
 }
 
 func TestPrintPagesMultipleWithDifferentFields(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Test with multiple pages with different fields set
 	page1 := swagger.PageBulk{}
 	page1.SetId("1")

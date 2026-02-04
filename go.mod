@@ -7,6 +7,8 @@ replace github.com/alexhokl/confluence-cli/swagger => ./swagger
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/alexhokl/confluence-cli/swagger v0.0.0-00010101000000-000000000000
+	github.com/fatih/color v1.18.0
+	github.com/mattn/go-runewidth v0.0.14
 	github.com/spf13/viper v1.21.0
 	github.com/yuin/goldmark v1.7.13
 )
@@ -14,6 +16,9 @@ require (
 require (
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
 	gopkg.in/validator.v2 v2.0.1 // indirect

@@ -91,6 +91,11 @@ func TestExtractCursor(t *testing.T) {
 }
 
 func TestPrintSpaces(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	tests := []struct {
 		name           string
 		spaces         []swagger.SpaceBulk

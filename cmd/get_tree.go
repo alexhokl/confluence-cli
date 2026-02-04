@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/alexhokl/confluence-cli/swagger"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -141,6 +142,8 @@ type pageNode struct {
 // If parentID is non-empty, only the subtree starting from that page is shown.
 // If titleFilter is non-empty, only branches containing matching pages are shown.
 func printPageTree(pages []swagger.PageBulk, titleFilter string, parentID string) {
+	color.NoColor = noColor
+
 	if len(pages) == 0 {
 		fmt.Println("No pages found in this space")
 		return
@@ -215,10 +218,14 @@ func printPageTree(pages []swagger.PageBulk, titleFilter string, parentID string
 		}
 	}
 
+	// Create color functions for tree output
+	yellow := color.New(color.FgYellow).SprintFunc()
+	cyan := color.New(color.FgCyan).SprintFunc()
+
 	// Print the tree
 	for i, root := range rootNodes {
 		isLast := i == len(rootNodes)-1
-		printNode(root, "", isLast)
+		printNode(root, "", isLast, yellow, cyan)
 	}
 }
 
@@ -286,15 +293,15 @@ func sortNodes(nodes []*pageNode) {
 }
 
 // printNode prints a single node and its children with proper tree formatting.
-func printNode(node *pageNode, prefix string, isLast bool) {
+func printNode(node *pageNode, prefix string, isLast bool, yellow func(a ...interface{}) string, cyan func(a ...interface{}) string) {
 	// Choose the appropriate connector
 	connector := "├── "
 	if isLast {
 		connector = "└── "
 	}
 
-	// Print this node
-	fmt.Printf("%s%s%s (ID: %s)\n", prefix, connector, node.title, node.id)
+	// Print this node with colored ID
+	fmt.Printf("%s%s%s %s\n", cyan(prefix), cyan(connector), node.title, yellow("(ID: "+node.id+")"))
 
 	// Determine the prefix for children
 	childPrefix := prefix
@@ -307,6 +314,6 @@ func printNode(node *pageNode, prefix string, isLast bool) {
 	// Print children
 	for i, child := range node.children {
 		childIsLast := i == len(node.children)-1
-		printNode(child, childPrefix, childIsLast)
+		printNode(child, childPrefix, childIsLast, yellow, cyan)
 	}
 }

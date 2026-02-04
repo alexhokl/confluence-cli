@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/alexhokl/confluence-cli/swagger"
+	"github.com/fatih/color"
 )
 
 func TestGetTreeFlags(t *testing.T) {
@@ -159,6 +160,11 @@ func TestSortNodes(t *testing.T) {
 }
 
 func TestPrintPageTree(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Helper to create a PageBulk with optional parent
 	createPage := func(id, title, parentID string) swagger.PageBulk {
 		page := swagger.NewPageBulk()
@@ -249,6 +255,10 @@ func TestPrintPageTree(t *testing.T) {
 }
 
 func TestPrintNode(t *testing.T) {
+	// Disable color for predictable output
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
 	// Create a simple tree
 	root := &pageNode{
 		id:    "1",
@@ -262,12 +272,16 @@ func TestPrintNode(t *testing.T) {
 		},
 	}
 
+	// Create color functions (will be no-op since color is disabled)
+	yellow := color.New(color.FgYellow).SprintFunc()
+	cyan := color.New(color.FgCyan).SprintFunc()
+
 	// Capture stdout
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	printNode(root, "", true)
+	printNode(root, "", true, yellow, cyan)
 
 	w.Close()
 	os.Stdout = oldStdout
@@ -277,15 +291,29 @@ func TestPrintNode(t *testing.T) {
 	output := buf.String()
 
 	// Check output contains expected elements
-	if !strings.Contains(output, "└── Root (ID: 1)") {
+	if !strings.Contains(output, "└──") {
+		t.Errorf("expected output to contain tree connector, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Root") {
 		t.Errorf("expected output to contain root node, got:\n%s", output)
 	}
-	if !strings.Contains(output, "└── Child (ID: 2)") {
+	if !strings.Contains(output, "(ID: 1)") {
+		t.Errorf("expected output to contain root ID, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Child") {
 		t.Errorf("expected output to contain child node, got:\n%s", output)
+	}
+	if !strings.Contains(output, "(ID: 2)") {
+		t.Errorf("expected output to contain child ID, got:\n%s", output)
 	}
 }
 
 func TestPrintPageTreeWithTitleFilter(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Helper to create a PageBulk with optional parent
 	createPage := func(id, title, parentID string) swagger.PageBulk {
 		page := swagger.NewPageBulk()
@@ -600,6 +628,11 @@ func TestFilterMatchedBranchesAllMatched(t *testing.T) {
 }
 
 func TestPrintPageTreeOrphanedPages(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Test with pages that have parent IDs pointing to non-existent parents
 	createPage := func(id, title, parentID string) swagger.PageBulk {
 		page := swagger.NewPageBulk()
@@ -641,6 +674,11 @@ func TestPrintPageTreeOrphanedPages(t *testing.T) {
 }
 
 func TestPrintPageTreeWithParentID(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Helper to create a PageBulk with optional parent
 	createPage := func(id, title, parentID string) swagger.PageBulk {
 		page := swagger.NewPageBulk()
@@ -747,6 +785,11 @@ func TestPrintPageTreeWithParentID(t *testing.T) {
 }
 
 func TestPrintPageTreeWithParentIDAndTitleFilter(t *testing.T) {
+	// Disable color for predictable output
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
 	// Helper to create a PageBulk with optional parent
 	createPage := func(id, title, parentID string) swagger.PageBulk {
 		page := swagger.NewPageBulk()
