@@ -122,3 +122,39 @@ func TestDeleteSpaceEmptyKey(t *testing.T) {
 		t.Errorf("expected 'space key is required' error, got: %s", err.Error())
 	}
 }
+
+func TestDeleteSpaceCommandMetadata(t *testing.T) {
+	cmd := deleteSpaceCmd
+
+	if cmd.Use != "space" {
+		t.Errorf("expected Use to be 'space', got '%s'", cmd.Use)
+	}
+
+	if cmd.Short == "" {
+		t.Error("expected Short description to be set")
+	}
+
+	if cmd.Long == "" {
+		t.Error("expected Long description to be set")
+	}
+
+	if cmd.RunE == nil {
+		t.Error("expected RunE to be set")
+	}
+
+	// Check key flag exists and has correct shorthand
+	keyFlag := cmd.Flags().Lookup("key")
+	if keyFlag == nil {
+		t.Error("expected 'key' flag to exist")
+	}
+	if keyFlag.Shorthand != "k" {
+		t.Errorf("expected 'key' flag shorthand to be 'k', got '%s'", keyFlag.Shorthand)
+	}
+}
+
+func TestDeleteSpaceFlags(t *testing.T) {
+	// Verify default flag values
+	if deleteSpaceKey != "" {
+		t.Errorf("expected default space key to be empty, got %s", deleteSpaceKey)
+	}
+}

@@ -246,3 +246,90 @@ func TestExtractPageContentWithMarkdownFormat(t *testing.T) {
 		t.Errorf("extractPageContent with md format = %q, want %q", content, expectedMarkdown)
 	}
 }
+
+func TestExtractPageContentWithAtlasDocFormat(t *testing.T) {
+	// Test with page that has atlas_doc_format content
+	atlasDocValue := `{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Hello"}]}]}`
+
+	atlasBody := swagger.NewBodyType()
+	atlasBody.SetValue(atlasDocValue)
+	atlasBody.SetRepresentation("atlas_doc_format")
+
+	bodySingle := swagger.NewBodySingle()
+	bodySingle.SetAtlasDocFormat(*atlasBody)
+
+	pageWithAtlasDoc := swagger.NewCreatePage200Response()
+	pageWithAtlasDoc.SetBody(*bodySingle)
+
+	content, err := extractPageContent(pageWithAtlasDoc, "atlas_doc_format")
+	if err != nil {
+		t.Errorf("extractPageContent with atlas_doc_format unexpected error: %v", err)
+	}
+	if content != atlasDocValue {
+		t.Errorf("extractPageContent with atlas_doc_format = %q, want %q", content, atlasDocValue)
+	}
+}
+
+func TestExtractPageContentWithViewFormat(t *testing.T) {
+	// Test with page that has view format content
+	viewValue := "<div class='content-wrapper'><p>Hello World</p></div>"
+
+	viewBody := swagger.NewBodyType()
+	viewBody.SetValue(viewValue)
+	viewBody.SetRepresentation("view")
+
+	bodySingle := swagger.NewBodySingle()
+	bodySingle.SetView(*viewBody)
+
+	pageWithView := swagger.NewCreatePage200Response()
+	pageWithView.SetBody(*bodySingle)
+
+	content, err := extractPageContent(pageWithView, "view")
+	if err != nil {
+		t.Errorf("extractPageContent with view format unexpected error: %v", err)
+	}
+	if content != viewValue {
+		t.Errorf("extractPageContent with view format = %q, want %q", content, viewValue)
+	}
+}
+
+func TestGetPageCommandMetadata(t *testing.T) {
+	cmd := getPageCmd
+
+	if cmd.Use != "page" {
+		t.Errorf("expected Use to be 'page', got '%s'", cmd.Use)
+	}
+
+	if cmd.Short == "" {
+		t.Error("expected Short description to be set")
+	}
+
+	if cmd.Long == "" {
+		t.Error("expected Long description to be set")
+	}
+
+	if cmd.RunE == nil {
+		t.Error("expected RunE to be set")
+	}
+
+	// Check id flag exists and is required
+	idFlag := cmd.Flags().Lookup("id")
+	if idFlag == nil {
+		t.Error("expected 'id' flag to exist")
+	}
+	if idFlag.Shorthand != "i" {
+		t.Errorf("expected 'id' flag shorthand to be 'i', got '%s'", idFlag.Shorthand)
+	}
+
+	// Check format flag exists
+	formatFlag := cmd.Flags().Lookup("format")
+	if formatFlag == nil {
+		t.Error("expected 'format' flag to exist")
+	}
+	if formatFlag.Shorthand != "f" {
+		t.Errorf("expected 'format' flag shorthand to be 'f', got '%s'", formatFlag.Shorthand)
+	}
+	if formatFlag.DefValue != "storage" {
+		t.Errorf("expected 'format' flag default to be 'storage', got '%s'", formatFlag.DefValue)
+	}
+}

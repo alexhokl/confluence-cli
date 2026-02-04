@@ -216,6 +216,44 @@ func TestUpdatePageFlags(t *testing.T) {
 	}
 }
 
+func TestUpdatePageCommandMetadata(t *testing.T) {
+	cmd := updatePageCmd
+
+	if cmd.Use != "page" {
+		t.Errorf("expected Use to be 'page', got '%s'", cmd.Use)
+	}
+
+	if cmd.Short == "" {
+		t.Error("expected Short description to be set")
+	}
+
+	if cmd.Long == "" {
+		t.Error("expected Long description to be set")
+	}
+
+	if cmd.RunE == nil {
+		t.Error("expected RunE to be set")
+	}
+
+	// Check id flag exists and is required
+	idFlag := cmd.Flags().Lookup("id")
+	if idFlag == nil {
+		t.Error("expected 'id' flag to exist")
+	}
+	if idFlag.Shorthand != "i" {
+		t.Errorf("expected 'id' flag shorthand to be 'i', got '%s'", idFlag.Shorthand)
+	}
+
+	// Check message flag exists
+	messageFlag := cmd.Flags().Lookup("message")
+	if messageFlag == nil {
+		t.Error("expected 'message' flag to exist")
+	}
+	if messageFlag.Shorthand != "m" {
+		t.Errorf("expected 'message' flag shorthand to be 'm', got '%s'", messageFlag.Shorthand)
+	}
+}
+
 func TestMarkdownToStorageRoundTrip(t *testing.T) {
 	// Test that we can convert markdown to storage format
 	// This tests the integration between the two conversion functions
