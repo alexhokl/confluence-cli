@@ -146,18 +146,23 @@ func containsIgnoreCase(s, substr string) bool {
 
 func printPages(pages []swagger.PageBulk) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tSPACE ID")
+	fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tSPACE ID\tPARENT ID")
 
 	for _, page := range pages {
 		status := ""
 		if page.HasStatus() {
 			status = string(page.GetStatus())
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		parentID := ""
+		if page.HasParentId() {
+			parentID = page.GetParentId()
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			page.GetId(),
 			page.GetTitle(),
 			status,
 			page.GetSpaceId(),
+			parentID,
 		)
 	}
 	w.Flush()
