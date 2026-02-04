@@ -8,6 +8,7 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
 	github.com/alexhokl/confluence-cli/swagger v0.0.0-00010101000000-000000000000
 	github.com/spf13/viper v1.21.0
+	github.com/yuin/goldmark v1.7.13
 )
 
 require (
