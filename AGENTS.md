@@ -6,6 +6,10 @@ This document provides instructions for AI coding agents working on the confluen
 
 confluence-cli is a Go CLI tool for interacting with the Confluence Cloud API. It uses the Atlassian Confluence Cloud REST API v2 (OpenAPI spec in `swagger.json`).
 
+- **CLI Framework**: Cobra (github.com/spf13/cobra)
+- **Configuration**: Viper (github.com/spf13/viper)
+- **API Client**: Auto-generated Swagger client for Confluence Cloud REST API v2
+
 ## Build System
 
 This project uses [Task](https://taskfile.dev/) as the build runner (alternative to Make).
