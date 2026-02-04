@@ -48,9 +48,9 @@ tasks:
       - sh: command -v openapi-generator
         msg: "openapi-generator is required but not installed. Install with: brew install openapi-generator"
       - sh: test -f swagger_confluence.json
-        msg: "swagger_confluence.json not found. Run 'task pull-swagger-confluence' first"
+        msg: "swagger.json not found. Run 'task pull-swagger-confluence' first"
     cmds:
       - rm -rf swagger_confluence
       - >-
-        openapi-generator generate -i swagger_confluence.json -g go -o swagger_confluence --package-name swagger_confluence --additional-properties=isGoSubmodule=true --git-user-id alexhokl --git-repo-id jira-cli
+        openapi-generator generate -i swagger.json -g go -o swagger --package-name swagger --additional-properties=isGoSubmodule=true --git-user-id alexhokl --git-repo-id jira-cli
       - go mod tidy
