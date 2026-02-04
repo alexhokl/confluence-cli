@@ -13,6 +13,7 @@ import (
 var getTreeSpaceID int64
 var getTreeSpaceKey string
 var getTreeTitle string
+var getTreeParentID string
 
 var getTreeCmd = &cobra.Command{
 	Use:   "tree",
@@ -21,6 +22,8 @@ var getTreeCmd = &cobra.Command{
 
 The tree shows the parent-child relationships between pages, with indentation
 indicating the nesting level.
+
+If --parent-id is specified, only the subtree starting from that page will be shown.
 
 If --title is specified, only branches containing pages with matching titles
 (partial match, case-insensitive) will be shown. This includes the matching
@@ -33,6 +36,9 @@ Examples:
   # Show page tree by space key
   confluence-cli get tree --space-key MYSPACE
 
+  # Show subtree starting from a specific page
+  confluence-cli get tree --space-key MYSPACE --parent-id 67890
+
   # Show only branches with pages matching "guide" in the title
   confluence-cli get tree --space-key MYSPACE --title guide`,
 	RunE: runGetTree,
@@ -43,6 +49,7 @@ func init() {
 	getTreeCmd.Flags().Int64Var(&getTreeSpaceID, "space-id", 0, "Space ID")
 	getTreeCmd.Flags().StringVarP(&getTreeSpaceKey, "space-key", "s", "", "Space key (e.g., MYSPACE)")
 	getTreeCmd.Flags().StringVarP(&getTreeTitle, "title", "t", "", "Filter by page title (partial match, case-insensitive)")
+	getTreeCmd.Flags().StringVarP(&getTreeParentID, "parent-id", "p", "", "Show subtree starting from this page ID")
 }
 
 func runGetTree(_ *cobra.Command, _ []string) error {
@@ -79,7 +86,7 @@ func runGetTree(_ *cobra.Command, _ []string) error {
 	}
 
 	// Build and print the tree
-	printPageTree(pages, getTreeTitle)
+	printPageTree(pages, getTreeTitle, getTreeParentID)
 	return nil
 }
 
@@ -131,8 +138,9 @@ type pageNode struct {
 }
 
 // printPageTree builds a tree structure from pages and prints it.
+// If parentID is non-empty, only the subtree starting from that page is shown.
 // If titleFilter is non-empty, only branches containing matching pages are shown.
-func printPageTree(pages []swagger.PageBulk, titleFilter string) {
+func printPageTree(pages []swagger.PageBulk, titleFilter string, parentID string) {
 	if len(pages) == 0 {
 		fmt.Println("No pages found in this space")
 		return
@@ -159,15 +167,15 @@ func printPageTree(pages []swagger.PageBulk, titleFilter string) {
 	var rootNodes []*pageNode
 	for _, page := range pages {
 		node := nodeMap[page.GetId()]
-		parentID := ""
+		pageParentID := ""
 		if page.HasParentId() {
-			parentID = page.GetParentId()
+			pageParentID = page.GetParentId()
 		}
 
-		if parentID == "" {
+		if pageParentID == "" {
 			// No parent - this is a root node
 			rootNodes = append(rootNodes, node)
-		} else if parentNode, exists := nodeMap[parentID]; exists {
+		} else if parentNode, exists := nodeMap[pageParentID]; exists {
 			// Parent exists in our page set
 			parentNode.children = append(parentNode.children, node)
 		} else {
@@ -179,6 +187,17 @@ func printPageTree(pages []swagger.PageBulk, titleFilter string) {
 
 	// Sort root nodes and all children alphabetically by title
 	sortNodes(rootNodes)
+
+	// If parent ID is specified, find that node and use it as the root
+	if parentID != "" {
+		parentNode, exists := nodeMap[parentID]
+		if !exists {
+			fmt.Printf("Page with ID '%s' not found in this space\n", parentID)
+			return
+		}
+		// Use the parent node as the single root
+		rootNodes = []*pageNode{parentNode}
+	}
 
 	// If title filter is specified, mark matching nodes and filter the tree
 	if titleFilter != "" {
