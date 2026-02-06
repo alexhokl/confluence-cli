@@ -112,12 +112,35 @@ func TestExtractPageContent(t *testing.T) {
 }
 
 func TestGetPageFlags(t *testing.T) {
-	// Verify default flag values
-	if getPageID != 0 {
-		t.Errorf("expected default page ID of 0, got %d", getPageID)
+	// Verify default flag values by checking the options struct
+	// Note: default values are set by Cobra flags, not by the struct initialization
+	// After init(), the flags will have default values configured
+
+	// Check that the id flag has the expected default
+	idFlag := getPageCmd.Flags().Lookup("id")
+	if idFlag == nil {
+		t.Error("expected 'id' flag to exist")
 	}
-	if getPageFormat != "storage" {
-		t.Errorf("expected default format of 'storage', got %s", getPageFormat)
+	if idFlag.DefValue != "0" {
+		t.Errorf("expected default page ID of 0, got %s", idFlag.DefValue)
+	}
+
+	// Check that the format flag has the expected default
+	formatFlag := getPageCmd.Flags().Lookup("format")
+	if formatFlag == nil {
+		t.Error("expected 'format' flag to exist")
+	}
+	if formatFlag.DefValue != "storage" {
+		t.Errorf("expected default format of 'storage', got %s", formatFlag.DefValue)
+	}
+
+	// Check that the no-images flag exists and has the expected default
+	noImagesFlag := getPageCmd.Flags().Lookup("no-images")
+	if noImagesFlag == nil {
+		t.Error("expected 'no-images' flag to exist")
+	}
+	if noImagesFlag.DefValue != "false" {
+		t.Errorf("expected default no-images of 'false', got %s", noImagesFlag.DefValue)
 	}
 }
 
@@ -331,5 +354,130 @@ func TestGetPageCommandMetadata(t *testing.T) {
 	}
 	if formatFlag.DefValue != "storage" {
 		t.Errorf("expected 'format' flag default to be 'storage', got '%s'", formatFlag.DefValue)
+	}
+
+	// Check no-images flag exists
+	noImagesFlag := cmd.Flags().Lookup("no-images")
+	if noImagesFlag == nil {
+		t.Error("expected 'no-images' flag to exist")
+	}
+	if noImagesFlag.DefValue != "false" {
+		t.Errorf("expected 'no-images' flag default to be 'false', got '%s'", noImagesFlag.DefValue)
+	}
+}
+
+func TestExtractFilename(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple filename",
+			input:    "image.png",
+			expected: "image.png",
+		},
+		{
+			name:     "path with slashes",
+			input:    "/download/attachments/123/image.png",
+			expected: "image.png",
+		},
+		{
+			name:     "path with query parameters",
+			input:    "image.png?version=1&modificationDate=123",
+			expected: "image.png",
+		},
+		{
+			name:     "full URL-like path with query",
+			input:    "/wiki/download/attachments/12345/screenshot.jpg?api=v2",
+			expected: "screenshot.jpg",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "just a slash",
+			input:    "/",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractFilename(tt.input)
+			if result != tt.expected {
+				t.Errorf("extractFilename(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestImagePattern(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		shouldMatch bool
+		altText     string
+		imageRef    string
+	}{
+		{
+			name:        "simple image",
+			input:       "![alt text](image.png)",
+			shouldMatch: true,
+			altText:     "alt text",
+			imageRef:    "image.png",
+		},
+		{
+			name:        "image with path",
+			input:       "![screenshot](/attachments/screenshot.jpg)",
+			shouldMatch: true,
+			altText:     "screenshot",
+			imageRef:    "/attachments/screenshot.jpg",
+		},
+		{
+			name:        "image with empty alt",
+			input:       "![](image.png)",
+			shouldMatch: true,
+			altText:     "",
+			imageRef:    "image.png",
+		},
+		{
+			name:        "not an image",
+			input:       "[link text](url)",
+			shouldMatch: false,
+		},
+		{
+			name:        "plain text",
+			input:       "Hello World",
+			shouldMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matches := imagePattern.FindStringSubmatch(tt.input)
+			if tt.shouldMatch {
+				if matches == nil {
+					t.Errorf("imagePattern.FindStringSubmatch(%q) expected match, got nil", tt.input)
+					return
+				}
+				if len(matches) < 3 {
+					t.Errorf("imagePattern.FindStringSubmatch(%q) expected 3 groups, got %d", tt.input, len(matches))
+					return
+				}
+				if matches[1] != tt.altText {
+					t.Errorf("alt text = %q, want %q", matches[1], tt.altText)
+				}
+				if matches[2] != tt.imageRef {
+					t.Errorf("image ref = %q, want %q", matches[2], tt.imageRef)
+				}
+			} else {
+				if matches != nil {
+					t.Errorf("imagePattern.FindStringSubmatch(%q) expected no match, got %v", tt.input, matches)
+				}
+			}
+		})
 	}
 }
