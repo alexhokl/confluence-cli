@@ -142,6 +142,15 @@ func TestGetPageFlags(t *testing.T) {
 	if noImagesFlag.DefValue != "false" {
 		t.Errorf("expected default no-images of 'false', got %s", noImagesFlag.DefValue)
 	}
+
+	// Check that the view flag exists and has the expected default
+	viewFlag := getPageCmd.Flags().Lookup("view")
+	if viewFlag == nil {
+		t.Error("expected 'view' flag to exist")
+	}
+	if viewFlag.DefValue != "false" {
+		t.Errorf("expected default view of 'false', got %s", viewFlag.DefValue)
+	}
 }
 
 func TestConvertStorageToMarkdown(t *testing.T) {
@@ -480,4 +489,29 @@ func TestImagePattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetPageCommandMetadataViewFlag(t *testing.T) {
+	// Verify the view flag is registered on the command
+	viewFlag := getPageCmd.Flags().Lookup("view")
+	if viewFlag == nil {
+		t.Fatal("expected 'view' flag to exist on get page command")
+	}
+	if viewFlag.DefValue != "false" {
+		t.Errorf("expected 'view' flag default to be 'false', got %s", viewFlag.DefValue)
+	}
+	if viewFlag.Usage == "" {
+		t.Error("expected 'view' flag to have a usage description")
+	}
+}
+
+func TestOpenInBrowser(t *testing.T) {
+	// openInBrowser should return an error only if the OS command fails to start.
+	// We cannot easily test the actual browser opening in a unit test, but we can
+	// verify it does not panic and handles a valid URL without error on this platform.
+	// Use a no-op test: just ensure the function exists and the signature is correct.
+	//
+	// On CI or headless environments the underlying OS command (open/xdg-open) may
+	// not be available, so we only verify the function compiles and is callable.
+	_ = openInBrowser // reference to confirm it is accessible within the package
 }

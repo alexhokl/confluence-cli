@@ -3,7 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
@@ -21,6 +24,7 @@ type getPageOptions struct {
 	id       int64
 	format   string
 	noImages bool
+	view     bool
 }
 
 var getPageOpts = getPageOptions{}
@@ -46,6 +50,9 @@ Examples:
   # Get page content without inline images
   confluence-cli get page -i 12345 -f md --no-images
 
+  # Open the page in the default web browser
+  confluence-cli get page -i 12345 --view
+
 Note: Images are displayed inline by default in terminals that support
 the Kitty graphics protocol (Ghostty, Kitty, WezTerm).`,
 	RunE: runGetPage,
@@ -56,6 +63,7 @@ func init() {
 	getPageCmd.Flags().Int64VarP(&getPageOpts.id, "id", "i", 0, "Page ID (required)")
 	getPageCmd.Flags().StringVarP(&getPageOpts.format, "format", "f", "storage", "Content format (storage, atlas_doc_format, view, md)")
 	getPageCmd.Flags().BoolVar(&getPageOpts.noImages, "no-images", false, "Do not display images inline")
+	getPageCmd.Flags().BoolVar(&getPageOpts.view, "view", false, "Open the page in the default web browser")
 	getPageCmd.MarkFlagRequired("id")
 }
 
@@ -85,6 +93,23 @@ func runGetPage(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to get page: %w", err)
 	}
 
+	// Open in browser if --view flag is set
+	if getPageOpts.view {
+		links := result.GetLinks()
+		base := links.GetBase()
+		if base == "" {
+			base = fmt.Sprintf("https://%s.atlassian.net/wiki", viper.GetString("organization"))
+		}
+
+		spaceKey, err := getSpaceKey(ctx, client, result.GetSpaceId())
+		if err != nil {
+			return fmt.Errorf("failed to get space key: %w", err)
+		}
+
+		pageURL := fmt.Sprintf("%s/spaces/%s/pages/%d", base, spaceKey, getPageOpts.id)
+		return openInBrowser(pageURL)
+	}
+
 	// Check if we should show images (default: yes, unless --no-images or terminal doesn't support it)
 	showImages := !getPageOpts.noImages && supportsKittyGraphics() && getPageOpts.format == "md"
 
@@ -110,6 +135,36 @@ func runGetPage(_ *cobra.Command, _ []string) error {
 		printContentWithImages(content, attMaps)
 	} else {
 		fmt.Println(content)
+	}
+	return nil
+}
+
+// getSpaceKey retrieves the key (e.g. "GW") for a space given its numeric string ID.
+func getSpaceKey(ctx context.Context, client *swagger.APIClient, spaceID string) (string, error) {
+	id, err := strconv.ParseInt(spaceID, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("invalid space ID %q: %w", spaceID, err)
+	}
+	space, _, err := client.SpaceAPI.GetSpaceById(ctx, id).Execute()
+	if err != nil {
+		return "", fmt.Errorf("failed to get space: %w", err)
+	}
+	return space.GetKey(), nil
+}
+
+// openInBrowser opens the given URL in the default web browser.
+func openInBrowser(url string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to open browser: %w", err)
 	}
 	return nil
 }
