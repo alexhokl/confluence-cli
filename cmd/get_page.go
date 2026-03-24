@@ -264,8 +264,47 @@ var acImagePattern = regexp.MustCompile(`<ac:image[^>]*>.*?<ri:attachment[^>]*ri
 // acImagePatternWithAlt matches ac:image with ac:alt attribute
 var acImagePatternWithAlt = regexp.MustCompile(`<ac:image[^>]*ac:alt="([^"]*)"[^>]*>.*?<ri:attachment[^>]*ri:filename="([^"]+)"[^>]*/?>.*?</ac:image>`)
 
+// acCodeMacroPattern matches Confluence code macro blocks.
+// Example: <ac:structured-macro ac:name="code" ...><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[...]]></ac:plain-text-body></ac:structured-macro>
+var acCodeMacroPattern = regexp.MustCompile(`(?s)<ac:structured-macro[^>]*ac:name="code"[^>]*>(.*?)</ac:structured-macro>`)
+
+// acCodeLanguagePattern extracts the language parameter from a code macro body.
+var acCodeLanguagePattern = regexp.MustCompile(`<ac:parameter[^>]*ac:name="language"[^>]*>(.*?)</ac:parameter>`)
+
+// acCodeBodyPattern extracts the CDATA content from a code macro plain-text body.
+var acCodeBodyPattern = regexp.MustCompile(`(?s)<ac:plain-text-body><!\[CDATA\[(.*?)\]\]></ac:plain-text-body>`)
+
 // preprocessConfluenceContent converts Confluence-specific markup to standard HTML.
 func preprocessConfluenceContent(content string) string {
+	// Convert Confluence code macros to standard <pre><code> blocks before HTML parsing,
+	// because the CDATA content would otherwise be lost or misinterpreted.
+	content = acCodeMacroPattern.ReplaceAllStringFunc(content, func(match string) string {
+		inner := acCodeMacroPattern.FindStringSubmatch(match)
+		if len(inner) < 2 {
+			return match
+		}
+		macroBody := inner[1]
+
+		// Extract optional language
+		lang := ""
+		langMatches := acCodeLanguagePattern.FindStringSubmatch(macroBody)
+		if len(langMatches) >= 2 {
+			lang = strings.TrimSpace(langMatches[1])
+		}
+
+		// Extract code content from CDATA
+		bodyMatches := acCodeBodyPattern.FindStringSubmatch(macroBody)
+		if len(bodyMatches) < 2 {
+			return match
+		}
+		code := bodyMatches[1]
+
+		if lang != "" {
+			return fmt.Sprintf(`<pre><code class="language-%s">%s</code></pre>`, lang, code)
+		}
+		return fmt.Sprintf(`<pre><code>%s</code></pre>`, code)
+	})
+
 	// First try to match images with alt text
 	content = acImagePatternWithAlt.ReplaceAllStringFunc(content, func(match string) string {
 		submatches := acImagePatternWithAlt.FindStringSubmatch(match)

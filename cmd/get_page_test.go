@@ -210,9 +210,24 @@ func TestConvertStorageToMarkdown(t *testing.T) {
 			expected: "`code`",
 		},
 		{
-			name:     "code block",
+			name:     "code block from pre/code tags",
 			input:    "<pre><code>func main() {}</code></pre>",
 			expected: "```\nfunc main() {}\n```",
+		},
+		{
+			name:     "code block from confluence code macro without language",
+			input:    `<ac:structured-macro ac:name="code" ac:schema-version="1"><ac:plain-text-body><![CDATA[func main() {}]]></ac:plain-text-body></ac:structured-macro>`,
+			expected: "```\nfunc main() {}\n```",
+		},
+		{
+			name:     "code block from confluence code macro with language",
+			input:    `<ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[SELECT 1;]]></ac:plain-text-body></ac:structured-macro>`,
+			expected: "```sql\nSELECT 1;\n```",
+		},
+		{
+			name:     "multiple confluence code macros",
+			input:    `<p>First</p><ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[package main]]></ac:plain-text-body></ac:structured-macro><p>Second</p><ac:structured-macro ac:name="code"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[SELECT 1;]]></ac:plain-text-body></ac:structured-macro>`,
+			expected: "First\n\n```go\npackage main\n```\n\nSecond\n\n```sql\nSELECT 1;\n```",
 		},
 		{
 			name:     "simple table",

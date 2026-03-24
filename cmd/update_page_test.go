@@ -63,9 +63,19 @@ func TestConvertMarkdownToStorage(t *testing.T) {
 			expected: "<p><code>code</code></p>\n",
 		},
 		{
-			name:     "code block",
+			name:     "code block without language",
 			input:    "```\nfunc main() {}\n```",
-			expected: "<pre><code>func main() {}\n</code></pre>\n",
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[func main() {}` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>` + "\n",
+		},
+		{
+			name:     "code block with language",
+			input:    "```sql\nSELECT 1;\n```",
+			expected: `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[SELECT 1;` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>` + "\n",
+		},
+		{
+			name:     "code block with go language",
+			input:    "```go\nfunc hello() {}\n```",
+			expected: `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[func hello() {}` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>` + "\n",
 		},
 		{
 			name:     "blockquote",
@@ -203,6 +213,56 @@ func TestOpenEditorError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "editor exited with error") {
 		t.Errorf("openEditor() error = %q, want error containing 'editor exited with error'", err.Error())
+	}
+}
+
+func TestPostprocessStorageContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no code blocks",
+			input:    "<p>Hello World</p>",
+			expected: "<p>Hello World</p>",
+		},
+		{
+			name:     "code block without language",
+			input:    "<pre><code>func main() {}\n</code></pre>",
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[func main() {}` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:     "code block with language",
+			input:    `<pre><code class="language-sql">SELECT 1;` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[SELECT 1;` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:     "code block with go language",
+			input:    `<pre><code class="language-go">package main` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[package main` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:     "inline code unchanged",
+			input:    "<p><code>inline</code></p>",
+			expected: "<p><code>inline</code></p>",
+		},
+		{
+			name:  "mixed content with code block",
+			input: "<p>Before</p>\n<pre><code class=\"language-sql\">SELECT 1;\n</code></pre>\n<p>After</p>",
+			expected: "<p>Before</p>\n" +
+				`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[SELECT 1;` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>` +
+				"\n<p>After</p>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := postprocessStorageContent(tt.input)
+			if result != tt.expected {
+				t.Errorf("postprocessStorageContent(%q)\n  got  %q\n  want %q", tt.input, result, tt.expected)
+			}
+		})
 	}
 }
 

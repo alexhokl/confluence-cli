@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 
 	"github.com/alexhokl/confluence-cli/swagger"
@@ -186,6 +187,14 @@ func openEditor(editor, content string) (string, error) {
 	return string(modifiedContent), nil
 }
 
+// htmlCodeBlockPattern matches HTML code blocks produced by goldmark.
+// Captures an optional language class and the code content.
+// Examples:
+//
+//	<pre><code class="language-sql">SELECT 1;\n</code></pre>
+//	<pre><code>func main() {}\n</code></pre>
+var htmlCodeBlockPattern = regexp.MustCompile(`(?s)<pre><code(?:\s+class="language-([^"]+)")?>(.+?)</code></pre>`)
+
 // convertMarkdownToStorage converts GitHub-flavored Markdown to Confluence storage format (XHTML).
 func convertMarkdownToStorage(markdown string) (string, error) {
 	md := goldmark.New(
@@ -202,5 +211,34 @@ func convertMarkdownToStorage(markdown string) (string, error) {
 		return "", fmt.Errorf("failed to convert markdown to HTML: %w", err)
 	}
 
-	return buf.String(), nil
+	// Post-process: convert <pre><code> blocks to Confluence code macros so that
+	// code is rendered with syntax highlighting in Confluence instead of as plain
+	// preformatted text.
+	result := postprocessStorageContent(buf.String())
+
+	return result, nil
+}
+
+// postprocessStorageContent converts standard HTML <pre><code> blocks to Confluence
+// ac:structured-macro code blocks.
+func postprocessStorageContent(content string) string {
+	return htmlCodeBlockPattern.ReplaceAllStringFunc(content, func(match string) string {
+		submatches := htmlCodeBlockPattern.FindStringSubmatch(match)
+		if len(submatches) < 3 {
+			return match
+		}
+		lang := submatches[1]
+		code := submatches[2]
+
+		if lang != "" {
+			return fmt.Sprintf(
+				`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">%s</ac:parameter><ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>`,
+				lang, code,
+			)
+		}
+		return fmt.Sprintf(
+			`<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>`,
+			code,
+		)
+	})
 }
