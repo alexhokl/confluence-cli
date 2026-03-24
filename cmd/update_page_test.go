@@ -78,6 +78,16 @@ func TestConvertMarkdownToStorage(t *testing.T) {
 			expected: `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[func hello() {}` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>` + "\n",
 		},
 		{
+			name:     "image with alt text",
+			input:    "![architecture diagram](diagram.png)",
+			expected: "<p><ac:image ac:alt=\"architecture diagram\"><ri:attachment ri:filename=\"diagram.png\"/></ac:image></p>\n",
+		},
+		{
+			name:     "image with empty alt",
+			input:    "![](photo.png)",
+			expected: "<p><ac:image><ri:attachment ri:filename=\"photo.png\"/></ac:image></p>\n",
+		},
+		{
 			name:     "blockquote",
 			input:    "> quoted text",
 			expected: "<blockquote>\n<p>quoted text</p>\n</blockquote>\n",
@@ -253,6 +263,34 @@ func TestPostprocessStorageContent(t *testing.T) {
 			expected: "<p>Before</p>\n" +
 				`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[SELECT 1;` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>` +
 				"\n<p>After</p>",
+		},
+		{
+			name:     "image with alt text",
+			input:    `<img src="screenshot.png" alt="my caption" />`,
+			expected: `<ac:image ac:alt="my caption"><ri:attachment ri:filename="screenshot.png"/></ac:image>`,
+		},
+		{
+			name:     "image with empty alt",
+			input:    `<img src="diagram.png" alt="" />`,
+			expected: `<ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>`,
+		},
+		{
+			name:     "image where alt equals filename (preprocessor default)",
+			input:    `<img src="photo.png" alt="photo.png" />`,
+			expected: `<ac:image><ri:attachment ri:filename="photo.png"/></ac:image>`,
+		},
+		{
+			name:  "mixed content with image",
+			input: `<p>See below</p>` + "\n" + `<img src="diagram.png" alt="architecture diagram" />` + "\n" + `<p>End</p>`,
+			expected: "<p>See below</p>\n" +
+				`<ac:image ac:alt="architecture diagram"><ri:attachment ri:filename="diagram.png"/></ac:image>` +
+				"\n<p>End</p>",
+		},
+		{
+			name:  "image and code block together",
+			input: `<img src="fig.png" alt="figure" />` + "\n" + `<pre><code class="language-go">fmt.Println()` + "\n" + `</code></pre>`,
+			expected: `<ac:image ac:alt="figure"><ri:attachment ri:filename="fig.png"/></ac:image>` + "\n" +
+				`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[fmt.Println()` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
 		},
 	}
 

@@ -230,6 +230,21 @@ func TestConvertStorageToMarkdown(t *testing.T) {
 			expected: "First\n\n```go\npackage main\n```\n\nSecond\n\n```sql\nSELECT 1;\n```",
 		},
 		{
+			name:     "image with alt text",
+			input:    `<ac:image ac:alt="my caption"><ri:attachment ri:filename="screenshot.png"/></ac:image>`,
+			expected: "![my caption](screenshot.png)",
+		},
+		{
+			name:     "image without alt text",
+			input:    `<ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>`,
+			expected: "![diagram.png](diagram.png)",
+		},
+		{
+			name:     "image with alt text in body text",
+			input:    `<p>See figure below.</p><ac:image ac:alt="architecture"><ri:attachment ri:filename="arch.png"/></ac:image><p>End of section.</p>`,
+			expected: "See figure below.\n\n![architecture](arch.png)\n\nEnd of section.",
+		},
+		{
 			name:     "simple table",
 			input:    "<table><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table>",
 			expected: "| Header |\n|--------|\n| Cell   |",

@@ -195,6 +195,14 @@ func openEditor(editor, content string) (string, error) {
 //	<pre><code>func main() {}\n</code></pre>
 var htmlCodeBlockPattern = regexp.MustCompile(`(?s)<pre><code(?:\s+class="language-([^"]+)")?>(.+?)</code></pre>`)
 
+// htmlImagePattern matches XHTML self-closing img tags produced by goldmark.
+// Captures the src and alt attribute values.
+// Examples:
+//
+//	<img src="screenshot.png" alt="caption" />
+//	<img src="diagram.png" alt="" />
+var htmlImagePattern = regexp.MustCompile(`<img\s+src="([^"]+)"\s+alt="([^"]*?)"\s*/>`)
+
 // convertMarkdownToStorage converts GitHub-flavored Markdown to Confluence storage format (XHTML).
 func convertMarkdownToStorage(markdown string) (string, error) {
 	md := goldmark.New(
@@ -219,10 +227,13 @@ func convertMarkdownToStorage(markdown string) (string, error) {
 	return result, nil
 }
 
-// postprocessStorageContent converts standard HTML <pre><code> blocks to Confluence
-// ac:structured-macro code blocks.
+// postprocessStorageContent converts standard HTML elements to their Confluence
+// storage format equivalents:
+//   - <pre><code> blocks → ac:structured-macro code blocks
+//   - <img> tags → ac:image blocks with ri:attachment
 func postprocessStorageContent(content string) string {
-	return htmlCodeBlockPattern.ReplaceAllStringFunc(content, func(match string) string {
+	// Convert <pre><code> blocks to Confluence code macros.
+	content = htmlCodeBlockPattern.ReplaceAllStringFunc(content, func(match string) string {
 		submatches := htmlCodeBlockPattern.FindStringSubmatch(match)
 		if len(submatches) < 3 {
 			return match
@@ -241,4 +252,29 @@ func postprocessStorageContent(content string) string {
 			code,
 		)
 	})
+
+	// Convert <img> tags to Confluence ac:image blocks with ri:attachment.
+	// If alt is empty or equal to the filename (the default set during preprocessing),
+	// omit ac:alt so Confluence treats it as having no caption.
+	content = htmlImagePattern.ReplaceAllStringFunc(content, func(match string) string {
+		submatches := htmlImagePattern.FindStringSubmatch(match)
+		if len(submatches) < 3 {
+			return match
+		}
+		src := submatches[1]
+		alt := submatches[2]
+
+		if alt != "" && alt != src {
+			return fmt.Sprintf(
+				`<ac:image ac:alt="%s"><ri:attachment ri:filename="%s"/></ac:image>`,
+				alt, src,
+			)
+		}
+		return fmt.Sprintf(
+			`<ac:image><ri:attachment ri:filename="%s"/></ac:image>`,
+			src,
+		)
+	})
+
+	return content
 }
