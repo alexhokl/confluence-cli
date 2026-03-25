@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/alexhokl/confluence-cli/swagger"
 	"github.com/spf13/cobra"
@@ -107,16 +108,27 @@ func runUpdatePage(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to edit content: %w", err)
 	}
 
-	// Check if content was modified
-	if originalMarkdown == modifiedMarkdown {
-		fmt.Println("No changes detected, page not updated")
-		return nil
-	}
-
 	// Convert markdown back to storage format
 	newStorage, err := convertMarkdownToStorage(modifiedMarkdown)
 	if err != nil {
 		return fmt.Errorf("failed to convert markdown to storage format: %w", err)
+	}
+
+	// Normalise the original storage through the same markdown round-trip so
+	// that the comparison is between two values produced by the same pipeline.
+	// Comparing raw markdown strings is insufficient: entities such as &amp; and
+	// &gt; are decoded to & and > by convertStorageToMarkdown, so the markdown
+	// strings can be identical while the resulting storage strings differ (the
+	// new pipeline unescapes those entities, the original does not).
+	normalizedOriginalStorage, err := convertMarkdownToStorage(originalMarkdown)
+	if err != nil {
+		return fmt.Errorf("failed to normalize original storage: %w", err)
+	}
+
+	// Check if content was modified
+	if normalizedOriginalStorage == newStorage {
+		fmt.Println("No changes detected, page not updated")
+		return nil
 	}
 
 	// Prepare update request
@@ -231,8 +243,12 @@ func convertMarkdownToStorage(markdown string) (string, error) {
 // storage format equivalents:
 //   - <pre><code> blocks → ac:structured-macro code blocks
 //   - <img> tags → ac:image blocks with ri:attachment
+//   - &gt; and &amp; HTML entities in text → literal > and & characters
+//     (CDATA sections produced by code-block conversion are left untouched)
 func postprocessStorageContent(content string) string {
 	// Convert <pre><code> blocks to Confluence code macros.
+	// This must happen first so that code content is wrapped in CDATA before
+	// we unescape &gt; entities, preventing double-processing of code blocks.
 	content = htmlCodeBlockPattern.ReplaceAllStringFunc(content, func(match string) string {
 		submatches := htmlCodeBlockPattern.FindStringSubmatch(match)
 		if len(submatches) < 3 {
@@ -276,5 +292,41 @@ func postprocessStorageContent(content string) string {
 		)
 	})
 
+	// Unescape &gt; and &amp; HTML entities back to their literal characters in
+	// text content, but leave content inside CDATA sections untouched.
+	// Goldmark escapes literal ">" and "&" to "&gt;" / "&amp;" when rendering to
+	// HTML, but Confluence storage format (XHTML) renders those entities as the
+	// literal strings "&gt;" / "&amp;" on the page.
+	content = unescapeEntitiesOutsideCDATA(content)
+
 	return content
+}
+
+// cdataPattern matches CDATA sections used in Confluence storage format.
+var cdataPattern = regexp.MustCompile(`(?s)<!\[CDATA\[.*?\]\]>`)
+
+// unescapeEntitiesOutsideCDATA replaces &gt; → > and &amp; → & everywhere in s
+// except inside <![CDATA[...]]> sections.
+func unescapeEntitiesOutsideCDATA(s string) string {
+	// Find all CDATA sections and build the result by processing the gaps
+	// between them (where entity unescaping is safe) while copying CDATA
+	// sections verbatim.
+	var b strings.Builder
+	last := 0
+	for _, loc := range cdataPattern.FindAllStringIndex(s, -1) {
+		// Unescape the segment before this CDATA section.
+		segment := s[last:loc[0]]
+		segment = strings.ReplaceAll(segment, "&gt;", ">")
+		segment = strings.ReplaceAll(segment, "&amp;", "&")
+		b.WriteString(segment)
+		// Copy the CDATA section verbatim.
+		b.WriteString(s[loc[0]:loc[1]])
+		last = loc[1]
+	}
+	// Unescape any trailing segment after the last CDATA section.
+	tail := s[last:]
+	tail = strings.ReplaceAll(tail, "&gt;", ">")
+	tail = strings.ReplaceAll(tail, "&amp;", "&")
+	b.WriteString(tail)
+	return b.String()
 }

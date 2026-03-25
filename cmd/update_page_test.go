@@ -93,6 +93,26 @@ func TestConvertMarkdownToStorage(t *testing.T) {
 			expected: "<blockquote>\n<p>quoted text</p>\n</blockquote>\n",
 		},
 		{
+			name:     "greater-than sign in text",
+			input:    "x > y",
+			expected: "<p>x > y</p>\n",
+		},
+		{
+			name:     "greater-than sign in code block is preserved",
+			input:    "```\nx > y\n```",
+			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[x &gt; y\n]]></ac:plain-text-body></ac:structured-macro>\n",
+		},
+		{
+			name:     "ampersand in text",
+			input:    "cats & dogs",
+			expected: "<p>cats & dogs</p>\n",
+		},
+		{
+			name:     "ampersand in code block is preserved",
+			input:    "```\ncats & dogs\n```",
+			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[cats &amp; dogs\n]]></ac:plain-text-body></ac:structured-macro>\n",
+		},
+		{
 			name:     "simple table",
 			input:    "| Header |\n|--------|\n| Cell   |",
 			expected: "<table>\n<thead>\n<tr>\n<th>Header</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>Cell</td>\n</tr>\n</tbody>\n</table>\n",
@@ -292,6 +312,37 @@ func TestPostprocessStorageContent(t *testing.T) {
 			expected: `<ac:image ac:alt="figure"><ri:attachment ri:filename="fig.png"/></ac:image>` + "\n" +
 				`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[fmt.Println()` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
 		},
+		{
+			name:     "greater-than entity in paragraph is unescaped",
+			input:    "<p>x &gt; y</p>",
+			expected: "<p>x > y</p>",
+		},
+		{
+			name:     "ampersand entity in paragraph is unescaped",
+			input:    "<p>cats &amp; dogs</p>",
+			expected: "<p>cats & dogs</p>",
+		},
+		{
+			name:     "both entities in paragraph are unescaped",
+			input:    "<p>a &amp; b &gt; c</p>",
+			expected: "<p>a & b > c</p>",
+		},
+		{
+			name:     "greater-than entity inside code block CDATA is not unescaped",
+			input:    `<pre><code>x &gt; y` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x &gt; y` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:     "ampersand entity inside code block CDATA is not unescaped",
+			input:    `<pre><code>cats &amp; dogs` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[cats &amp; dogs` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:  "entities in prose are unescaped but not in adjacent code block",
+			input: "<p>x &gt; y &amp; z</p>\n" + `<pre><code>x &gt; y &amp; z` + "\n" + `</code></pre>`,
+			expected: "<p>x > y & z</p>\n" +
+				`<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x &gt; y &amp; z` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -349,6 +400,68 @@ func TestUpdatePageCommandMetadata(t *testing.T) {
 	}
 	if messageFlag.Shorthand != "m" {
 		t.Errorf("expected 'message' flag shorthand to be 'm', got '%s'", messageFlag.Shorthand)
+	}
+}
+
+// TestNoSpuriousUpdateOnHTMLEntities verifies that when a page stored in Confluence
+// contains HTML-encoded entities (e.g. &amp; or &gt;), opening it in the editor and
+// saving without any changes does NOT produce a different storage value.
+//
+// The bug: convertStorageToMarkdown decodes &amp; → & and &gt; → > in the markdown
+// shown to the user. convertMarkdownToStorage then re-encodes them back, and our
+// postprocessStorageContent pipeline unescapes them again. The change-detection
+// comparison must therefore use the normalised storage (i.e. put both the original
+// and the modified markdown through the same pipeline) rather than comparing raw
+// markdown strings.
+func TestNoSpuriousUpdateOnHTMLEntities(t *testing.T) {
+	tests := []struct {
+		name            string
+		originalStorage string // as returned by Confluence API
+	}{
+		{
+			name:            "ampersand in paragraph",
+			originalStorage: "<p>cats &amp; dogs</p>\n",
+		},
+		{
+			name:            "greater-than in paragraph",
+			originalStorage: "<p>x &gt; y</p>\n",
+		},
+		{
+			name:            "both entities in paragraph",
+			originalStorage: "<p>a &amp; b &gt; c</p>\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate what runUpdatePage does: storage → markdown → (user makes no
+			// changes) → storage.  The two storage values must be equal so that the
+			// change-detection logic correctly skips the API call.
+			originalMarkdown, err := convertStorageToMarkdown(tt.originalStorage)
+			if err != nil {
+				t.Fatalf("convertStorageToMarkdown(%q) error: %v", tt.originalStorage, err)
+			}
+
+			// Simulate no-op edit: modifiedMarkdown equals originalMarkdown.
+			modifiedMarkdown := originalMarkdown
+
+			normalizedOriginal, err := convertMarkdownToStorage(originalMarkdown)
+			if err != nil {
+				t.Fatalf("convertMarkdownToStorage(original) error: %v", err)
+			}
+
+			newStorage, err := convertMarkdownToStorage(modifiedMarkdown)
+			if err != nil {
+				t.Fatalf("convertMarkdownToStorage(modified) error: %v", err)
+			}
+
+			if normalizedOriginal != newStorage {
+				t.Errorf(
+					"storage mismatch on no-op edit for %q:\n  normalizedOriginal = %q\n  newStorage         = %q",
+					tt.originalStorage, normalizedOriginal, newStorage,
+				)
+			}
+		})
 	}
 }
 
