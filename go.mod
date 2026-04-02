@@ -20,12 +20,12 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/oauth2 v0.28.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	gopkg.in/validator.v2 v2.0.1 // indirect
 )
 
 require (
-	github.com/alexhokl/helper v0.0.89
+	github.com/alexhokl/helper v0.0.93
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -41,3 +41,5 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )
+
+// replace github.com/alexhokl/helper => ../helper

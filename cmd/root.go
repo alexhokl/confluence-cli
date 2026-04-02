@@ -2,18 +2,24 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/alexhokl/helper/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
-var noColor bool
+var (
+	cfgFile string
+	noColor bool
+)
+
+const applicationName = "confluence-cli"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:               "confluence-cli",
+	Use:               applicationName,
 	Short:             "A CLI application to talk to Confluence APIs",
 	SilenceUsage:      true,
 	PersistentPreRunE: validateConfiguration,
@@ -25,7 +31,13 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.confluence-cli.yaml)")
+
+	defaultConfigDesc := fmt.Sprintf("$HOME/.config/%s/config.yaml", applicationName)
+	if configDir, err := os.UserConfigDir(); err == nil {
+		defaultConfigDesc = filepath.Join(configDir, applicationName, "config.yaml")
+	}
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("config file (default: %s)", defaultConfigDesc))
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable color output")
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
