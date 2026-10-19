@@ -54,3 +54,10 @@ tasks:
       - >-
         openapi-generator generate -i swagger.json -g go -o swagger --package-name swagger --additional-properties=isGoSubmodule=true --git-user-id alexhokl --git-repo-id confluence-cli
       - go mod tidy
+
+  install-skill:
+    desc: Install the skill to the local system
+    cmds:
+      - mkdir -p ~/.agents/skills ~/.claude/skills
+      - ln -snf "{{.TASKFILE_DIR}}/skills/confluence-cli" ~/.agents/skills/confluence-cli
+      - ln -snf "{{.TASKFILE_DIR}}/skills/confluence-cli" ~/.claude/skills/confluence-cli
