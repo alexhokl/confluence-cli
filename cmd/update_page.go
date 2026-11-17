@@ -131,6 +131,8 @@ func runUpdatePage(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	newStorage = restoreOriginalImages(newStorage, originalStorage)
+
 	// Prepare update request
 	newVersion := int32(currentVersionNumber + 1)
 	version := swagger.NewUpdatePageRequestVersion()
@@ -300,6 +302,33 @@ func postprocessStorageContent(content string) string {
 	content = unescapeEntitiesOutsideCDATA(content)
 
 	return content
+}
+
+// storageImagePattern matches a complete Confluence ac:image element, including
+// attributes and child elements (such as ac:adf-mark) that markdown cannot represent.
+var storageImagePattern = regexp.MustCompile(`(?s)<ac:image[^>]*>.*?</ac:image>`)
+
+// restoreOriginalImages replaces each ac:image generated from markdown with the
+// original page's ac:image markup when the markdown left that image unchanged.
+// The markdown round-trip keeps only the filename and alt text, so without this
+// an update drops width, alignment, layout and borders. Confluence then renders
+// an image at its original size, which for some SVGs is 1x1 pixels.
+// Images whose filename or alt text was edited keep the generated markup.
+func restoreOriginalImages(newStorage, originalStorage string) string {
+	originalsByGenerated := make(map[string][]string)
+	for _, original := range storageImagePattern.FindAllString(originalStorage, -1) {
+		generated := postprocessStorageContent(preprocessConfluenceContent(original))
+		originalsByGenerated[generated] = append(originalsByGenerated[generated], original)
+	}
+
+	return storageImagePattern.ReplaceAllStringFunc(newStorage, func(generated string) string {
+		originals := originalsByGenerated[generated]
+		if len(originals) == 0 {
+			return generated
+		}
+		originalsByGenerated[generated] = originals[1:]
+		return originals[0]
+	})
 }
 
 // cdataPattern matches CDATA sections used in Confluence storage format.

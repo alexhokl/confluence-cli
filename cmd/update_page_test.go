@@ -511,3 +511,67 @@ func TestMarkdownToStorageRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestRestoreOriginalImages(t *testing.T) {
+	sizedImage := `<ac:image ac:align="left" ac:layout="align-start" ac:original-height="1" ac:original-width="1" ac:custom-width="true" ac:alt="diagram.svg" ac:width="564"><ri:attachment ri:filename="diagram.svg" ri:version-at-save="1" /><ac:adf-mark key="border" size="2" color="#091e4224" /></ac:image>`
+	captionedImage := `<ac:image ac:alt="A caption" ac:width="300"><ri:attachment ri:filename="photo.png" /></ac:image>`
+
+	tests := []struct {
+		name             string
+		originalStorage  string
+		editMarkdown     func(string) string
+		expectedContains []string
+		expectedAbsent   []string
+	}{
+		{
+			name:             "unchanged image keeps its attributes when other text is edited",
+			originalStorage:  `<h2>Diagram</h2>` + sizedImage + `<p>Old text</p>`,
+			editMarkdown:     func(md string) string { return strings.Replace(md, "Old text", "New text", 1) },
+			expectedContains: []string{sizedImage, "<p>New text</p>"},
+		},
+		{
+			name:             "image with an edited caption uses the generated markup",
+			originalStorage:  captionedImage,
+			editMarkdown:     func(md string) string { return strings.Replace(md, "A caption", "New caption", 1) },
+			expectedContains: []string{`<ac:image ac:alt="New caption"><ri:attachment ri:filename="photo.png"/></ac:image>`},
+			expectedAbsent:   []string{`ac:width="300"`},
+		},
+		{
+			name:            "each repeated image keeps its own original markup",
+			originalStorage: sizedImage + `<p>Between</p>` + strings.Replace(sizedImage, `ac:width="564"`, `ac:width="200"`, 1),
+			editMarkdown:    func(md string) string { return strings.Replace(md, "Between", "Changed", 1) },
+			expectedContains: []string{
+				sizedImage + "</p>\n<p>Changed</p>\n<p>" + strings.Replace(sizedImage, `ac:width="564"`, `ac:width="200"`, 1),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			markdown, err := convertStorageToMarkdown(tt.originalStorage)
+			if err != nil {
+				t.Fatalf("convertStorageToMarkdown() error: %v", err)
+			}
+			newStorage, err := convertMarkdownToStorage(tt.editMarkdown(markdown))
+			if err != nil {
+				t.Fatalf("convertMarkdownToStorage() error: %v", err)
+			}
+
+			// Act
+			result := restoreOriginalImages(newStorage, tt.originalStorage)
+
+			// Assert
+			for _, want := range tt.expectedContains {
+				if !strings.Contains(result, want) {
+					t.Errorf("restoreOriginalImages() = %q, want it to contain %q", result, want)
+				}
+			}
+			for _, unwanted := range tt.expectedAbsent {
+				if strings.Contains(result, unwanted) {
+					t.Errorf("restoreOriginalImages() = %q, want it not to contain %q", result, unwanted)
+				}
+			}
+		})
+	}
+}
