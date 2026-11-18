@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"html"
 	"os/exec"
 	"regexp"
 	"runtime"
@@ -297,7 +298,9 @@ func preprocessConfluenceContent(content string) string {
 		if len(bodyMatches) < 2 {
 			return match
 		}
-		code := bodyMatches[1]
+		// CDATA is raw text, so escape it to keep characters such as < and >
+		// from being parsed as HTML markup.
+		code := html.EscapeString(bodyMatches[1])
 
 		if lang != "" {
 			return fmt.Sprintf(`<pre><code class="language-%s">%s</code></pre>`, lang, code)

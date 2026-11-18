@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	stdhtml "html"
 	"os"
 	"os/exec"
 	"regexp"
@@ -246,7 +247,10 @@ func convertMarkdownToStorage(markdown string) (string, error) {
 //   - <pre><code> blocks → ac:structured-macro code blocks
 //   - <img> tags → ac:image blocks with ri:attachment
 //   - &gt; and &amp; HTML entities in text → literal > and & characters
-//     (CDATA sections produced by code-block conversion are left untouched)
+//
+// Code block content is HTML-unescaped when it is wrapped in CDATA, because
+// CDATA is raw text and Confluence would otherwise show entities such as &lt;
+// and &gt; literally (e.g. arrows in an ASCII diagram).
 func postprocessStorageContent(content string) string {
 	// Convert <pre><code> blocks to Confluence code macros.
 	// This must happen first so that code content is wrapped in CDATA before
@@ -257,7 +261,7 @@ func postprocessStorageContent(content string) string {
 			return match
 		}
 		lang := submatches[1]
-		code := submatches[2]
+		code := stdhtml.UnescapeString(submatches[2])
 
 		if lang != "" {
 			return fmt.Sprintf(
@@ -335,7 +339,7 @@ func restoreOriginalImages(newStorage, originalStorage string) string {
 var cdataPattern = regexp.MustCompile(`(?s)<!\[CDATA\[.*?\]\]>`)
 
 // unescapeEntitiesOutsideCDATA replaces &gt; → > and &amp; → & everywhere in s
-// except inside <![CDATA[...]]> sections.
+// except inside <![CDATA[...]]> sections, whose content is already raw text.
 func unescapeEntitiesOutsideCDATA(s string) string {
 	// Find all CDATA sections and build the result by processing the gaps
 	// between them (where entity unescaping is safe) while copying CDATA

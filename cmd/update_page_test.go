@@ -100,7 +100,22 @@ func TestConvertMarkdownToStorage(t *testing.T) {
 		{
 			name:     "greater-than sign in code block is preserved",
 			input:    "```\nx > y\n```",
-			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[x &gt; y\n]]></ac:plain-text-body></ac:structured-macro>\n",
+			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[x > y\n]]></ac:plain-text-body></ac:structured-macro>\n",
+		},
+		{
+			name:     "less-than sign in code block is preserved",
+			input:    "```\nx < y\n```",
+			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[x < y\n]]></ac:plain-text-body></ac:structured-macro>\n",
+		},
+		{
+			name:     "double quote in code block is preserved",
+			input:    "```bash\necho \"hi\"\n```",
+			expected: "<ac:structured-macro ac:name=\"code\"><ac:parameter ac:name=\"language\">bash</ac:parameter><ac:plain-text-body><![CDATA[echo \"hi\"\n]]></ac:plain-text-body></ac:structured-macro>\n",
+		},
+		{
+			name:     "ascii diagram arrows in code block are preserved",
+			input:    "```\nstaging ──> uat\n   <── back\n```",
+			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[staging ──> uat\n   <── back\n]]></ac:plain-text-body></ac:structured-macro>\n",
 		},
 		{
 			name:     "ampersand in text",
@@ -110,7 +125,7 @@ func TestConvertMarkdownToStorage(t *testing.T) {
 		{
 			name:     "ampersand in code block is preserved",
 			input:    "```\ncats & dogs\n```",
-			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[cats &amp; dogs\n]]></ac:plain-text-body></ac:structured-macro>\n",
+			expected: "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA[cats & dogs\n]]></ac:plain-text-body></ac:structured-macro>\n",
 		},
 		{
 			name:     "simple table",
@@ -328,20 +343,40 @@ func TestPostprocessStorageContent(t *testing.T) {
 			expected: "<p>a & b > c</p>",
 		},
 		{
-			name:     "greater-than entity inside code block CDATA is not unescaped",
+			name:     "greater-than entity in code block is unescaped into CDATA",
 			input:    `<pre><code>x &gt; y` + "\n" + `</code></pre>`,
-			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x &gt; y` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x > y` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
 		},
 		{
-			name:     "ampersand entity inside code block CDATA is not unescaped",
+			name:     "less-than entity in code block is unescaped into CDATA",
+			input:    `<pre><code>x &lt; y` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x < y` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:     "ampersand entity in code block is unescaped into CDATA",
 			input:    `<pre><code>cats &amp; dogs` + "\n" + `</code></pre>`,
-			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[cats &amp; dogs` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[cats & dogs` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
 		},
 		{
-			name:  "entities in prose are unescaped but not in adjacent code block",
+			name:     "quote entity in code block with language is unescaped into CDATA",
+			input:    `<pre><code class="language-bash">echo &quot;a&lt;b&gt;&quot;` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">bash</ac:parameter><ac:plain-text-body><![CDATA[echo "a<b>"` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:     "ascii diagram arrows in code block are unescaped into CDATA",
+			input:    `<pre><code>staging ──&gt; uat` + "\n" + `   &lt;── back` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[staging ──> uat` + "\n" + `   <── back` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:     "double-escaped entity in code block is unescaped once",
+			input:    `<pre><code>&amp;gt;` + "\n" + `</code></pre>`,
+			expected: `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[&gt;` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+		},
+		{
+			name:  "entities in prose and adjacent code block are both unescaped",
 			input: "<p>x &gt; y &amp; z</p>\n" + `<pre><code>x &gt; y &amp; z` + "\n" + `</code></pre>`,
 			expected: "<p>x > y & z</p>\n" +
-				`<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x &gt; y &amp; z` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
+				`<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x > y & z` + "\n" + `]]></ac:plain-text-body></ac:structured-macro>`,
 		},
 	}
 
@@ -350,6 +385,50 @@ func TestPostprocessStorageContent(t *testing.T) {
 			result := postprocessStorageContent(tt.input)
 			if result != tt.expected {
 				t.Errorf("postprocessStorageContent(%q)\n  got  %q\n  want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCodeBlockRoundTrip(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+	}{
+		{
+			name: "comparison operators",
+			code: "if a < b && c > d {\n",
+		},
+		{
+			name: "html-like markup",
+			code: "<div class=\"x\">List<T></div>\n",
+		},
+		{
+			name: "ascii diagram",
+			code: "staging ──> uat ──> production\n   |\n   └──> feature\n   <── back\n",
+		},
+		{
+			name: "literal entity text",
+			code: "&gt; stays &amp;lt;\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storage := `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[` + tt.code + `]]></ac:plain-text-body></ac:structured-macro>`
+
+			markdown, err := convertStorageToMarkdown(storage)
+			if err != nil {
+				t.Fatalf("convertStorageToMarkdown() unexpected error: %v", err)
+			}
+			result, err := convertMarkdownToStorage(markdown)
+			if err != nil {
+				t.Fatalf("convertMarkdownToStorage() unexpected error: %v", err)
+			}
+
+			want := storage + "\n"
+			if result != want {
+				t.Errorf("round trip via markdown %q\n  got  %q\n  want %q", markdown, result, want)
 			}
 		})
 	}

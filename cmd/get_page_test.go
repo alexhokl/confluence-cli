@@ -225,6 +225,16 @@ func TestConvertStorageToMarkdown(t *testing.T) {
 			expected: "```sql\nSELECT 1;\n```",
 		},
 		{
+			name:     "code block from confluence code macro with html special characters",
+			input:    `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[a <b> c && d > "e"]]></ac:plain-text-body></ac:structured-macro>`,
+			expected: "```\na <b> c && d > \"e\"\n```",
+		},
+		{
+			name:     "code block from confluence code macro with ascii diagram",
+			input:    `<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[staging ──> uat` + "\n" + `   <── back]]></ac:plain-text-body></ac:structured-macro>`,
+			expected: "```\nstaging ──> uat\n   <── back\n```",
+		},
+		{
 			name:     "multiple confluence code macros",
 			input:    `<p>First</p><ac:structured-macro ac:name="code"><ac:parameter ac:name="language">go</ac:parameter><ac:plain-text-body><![CDATA[package main]]></ac:plain-text-body></ac:structured-macro><p>Second</p><ac:structured-macro ac:name="code"><ac:parameter ac:name="language">sql</ac:parameter><ac:plain-text-body><![CDATA[SELECT 1;]]></ac:plain-text-body></ac:structured-macro>`,
 			expected: "First\n\n```go\npackage main\n```\n\nSecond\n\n```sql\nSELECT 1;\n```",
